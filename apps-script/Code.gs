@@ -25,8 +25,12 @@ TEXT_COLS[NOTICE] = [1, 2];
 var P = {PIN: 1, FIRST: 18, LAST: 19, JSON: 20}; // 진도 시트 열 위치(0부터)
 var ACTIVE = '재직', LEFT = '퇴사';
 
+// 연결 확인용: 코드 값은 알려 주지 않고, 시트 연결 여부와 코드 설정 여부만 답합니다.
 function doGet() {
-  return out_({ok: true, service: 'onboarding', message: '정상 작동 중입니다.'});
+  var props = PropertiesService.getScriptProperties();
+  return out_({ok: true, service: 'onboarding', message: '정상 작동 중입니다.',
+    bound: !!SpreadsheetApp.getActiveSpreadsheet(),
+    configured: !!(props.getProperty('ACCESS_CODE') && props.getProperty('ADMIN_CODE'))});
 }
 
 function doPost(e) {
@@ -45,6 +49,7 @@ function doPost(e) {
 }
 
 function handle_(p) {
+  if (!SpreadsheetApp.getActiveSpreadsheet()) return {ok: false, error: 'not_bound'};
   var props = PropertiesService.getScriptProperties();
   var ACCESS = props.getProperty('ACCESS_CODE'), ADMIN = props.getProperty('ADMIN_CODE');
   if (!ACCESS || !ADMIN) return {ok: false, error: 'not_configured'};

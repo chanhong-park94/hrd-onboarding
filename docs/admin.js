@@ -9,6 +9,7 @@ let CODE = "", DATA = null, TAB = "dash", BUSY = false;
 const AERR = {
   bad_admin_code: "관리자 코드가 맞지 않습니다.",
   not_configured: "Apps Script의 스크립트 속성(ACCESS_CODE, ADMIN_CODE)을 먼저 설정하세요.",
+  not_bound: "Apps Script가 시트에 연결돼 있지 않습니다. 구글 시트의 [확장 프로그램 > Apps Script]에서 만든 뒤 다시 배포하세요.",
   exists: "같은 이름이 이미 있습니다.",
   bad_date: "날짜를 모두 입력하세요.",
   bad_range: "마감일이 시작일보다 빠릅니다.",
