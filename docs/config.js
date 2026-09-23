@@ -6,7 +6,7 @@
  */
 window.ORG_CONFIG = {
   // 화면과 인증서에 표시할 기관 이름
-  ORG_NAME: "○○직업전문학교",
+  ORG_NAME: "패스트캠퍼스 천호학원",
 
   // 로고 파일 이름. docs 폴더에 logo.png를 올리고 "logo.png"로 적으세요. 없으면 "" 그대로 두세요.
   ORG_LOGO: "",
