@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>운영진 온보딩 관리자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gowun+Batang:wght@700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar" id="adminTop" hidden>
+  <div class="in">
+    <span class="brand"><span class="seal">관리</span><b id="brandName">운영진 온보딩</b></span>
+    <nav class="nav" id="adminNav" aria-label="관리 메뉴">
+      <button type="button" data-tab="dash">대시보드</button>
+      <button type="button" data-tab="roster">운영진 명단</button>
+      <button type="button" data-tab="cohort">기수·일정</button>
+      <button type="button" data-tab="notice">공지사항</button>
+    </nav>
+    <div class="lvl">
+      <span class="sync" id="adminSync"></span>
+      <button class="btn ghost sm" type="button" id="adminLogout">로그아웃</button>
+    </div>
+  </div>
+</header>
+<section class="wrap gate" id="adminGate" hidden></section>
+<main class="wrap" id="adminApp" aria-live="polite"></main>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

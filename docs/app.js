@@ -94,12 +94,14 @@ function go(r, arg){
   ROUTE = r; setNav(r);
   const a = app(); a.innerHTML = "";
   const v = el("section", {class:"view"}); a.appendChild(v);
-  ({home:viewHome, path:viewPath, module:viewModule, wrong:viewWrong, badges:viewBadges, speed:viewSpeed, final:viewFinalIntro})[r](v, arg);
+  ({home:viewHome, path:viewPath, module:viewModule, wrong:viewWrong, badges:viewBadges, speed:viewSpeed, final:viewFinalIntro,
+    guide:viewGuide, tools:viewTools, library:viewLibrary})[r](v, arg);
   window.scrollTo({top:0});
 }
 
 /* ---------- home ---------- */
 function viewHome(v){
+  homeTop(v);
   const c = clearedCount(), started = CURR.some(m => modState(m.id).attempts > 0);
   const boxes = [
     {h:"담당", on:started, s:"착수", cap:"학습 시작"},
@@ -147,6 +149,60 @@ function viewHome(v){
   ];
   tiles.forEach(t => { const b = el("button", {class:"mode", type:"button"}, `<span class="k">${t.k}</span><span class="st">${t.h}</span><span class="sd">${t.p}</span>`); b.onclick = t.fn; modes.appendChild(b); });
   v.appendChild(modes);
+}
+
+/* ---------- home: my cohort deadline and notices ---------- */
+let HOMEINFO = {profile:null, notices:[]};
+function homeKey(){ return KEY + ":home:" + (USER ? USER.name : "guest"); }
+function setHomeInfo(r){
+  HOMEINFO = {profile:(r && r.profile) || null, notices:(r && Array.isArray(r.notices)) ? r.notices : []};
+  try{ localStorage.setItem(homeKey(), JSON.stringify(HOMEINFO)); }catch(e){}
+}
+function loadHomeInfo(){
+  HOMEINFO = {profile:null, notices:[]};
+  try{ const raw = localStorage.getItem(homeKey()); if(raw) HOMEINFO = JSON.parse(raw); }catch(e){}
+}
+function ymd(d){ return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function fmtYmd(s){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || "")); return m ? m[1] + "." + Number(m[2]) + "." + Number(m[3]) + "." : String(s || ""); }
+function daysUntil(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || "")); if(!m) return null;
+  const due = new Date(+m[1], +m[2] - 1, +m[3]), t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((due - t) / 86400000);
+}
+function onboardDone(){ return clearedCount() >= CURR.length && S.final.passed; }
+function previewHomeInfo(){
+  const t = new Date(), d = new Date(); d.setDate(d.getDate() + 14);
+  return {profile:{cohort:"예시 1기", start:ymd(t), due:ymd(d)},
+    notices:[{id:"ex", date:ymd(t), title:"미리보기 예시 공지", body:"관리자 화면(admin.html)에서 쓴 공지가 여기에 나옵니다.", important:true}]};
+}
+function homeTop(v){
+  const P = HOMEINFO.profile, N = HOMEINFO.notices || [];
+  if(P && P.cohort){
+    const done = onboardDone(), n = daysUntil(P.due), c = clearedCount();
+    const dd = done ? "완료" : n === null ? "" : n > 0 ? "D-" + n : n === 0 ? "D-day" : "D+" + (-n);
+    const card = el("div", {class:"sheet cohort"});
+    card.innerHTML = `<div><p class="eyebrow">내 온보딩 · <span class="coh"></span></p>
+      <p style="font-size:15px;margin-top:4px">${P.start ? fmtYmd(P.start) + " 시작 · " : ""}${P.due ? "마감 " + fmtYmd(P.due) : "마감일 미정"}${!done && n !== null && n < 0 ? " · 마감이 지났습니다" : ""}</p>
+      <div class="checks"><span class="pill ${c >= CURR.length ? "ok" : ""}">8단계 통과 ${c}/${CURR.length}</span><span class="pill ${S.final.passed ? "ok" : ""}">최종 심사 ${S.final.passed ? "합격" : "전"}</span></div></div>
+      <div class="dday ${done ? "done" : n !== null && n < 0 ? "late" : ""}">${dd}</div>`;
+    card.querySelector(".coh").textContent = P.cohort;
+    v.appendChild(card);
+  }
+  if(N.length){
+    const box = el("div", {class:"notices", "aria-label":"공지사항"});
+    const draw = all => {
+      box.innerHTML = "";
+      (all ? N : N.slice(0, 3)).forEach(x => {
+        const it = el("div", {class:"notice" + (x.important ? " imp" : "")});
+        it.innerHTML = `<div class="nt">${x.important ? '<span class="pill bad">중요</span>' : ""}<b></b><small>${fmtYmd(x.date)}</small></div><p></p>`;
+        it.querySelector("b").textContent = x.title; it.querySelector("p").textContent = x.body;
+        box.appendChild(it);
+      });
+      if(!all && N.length > 3){ const more = el("button", {class:"linkbtn", type:"button"}, "공지 " + (N.length - 3) + "건 더 보기"); more.onclick = () => draw(true); box.appendChild(more); }
+    };
+    draw(false);
+    v.appendChild(box);
+  }
 }
 
 /* ---------- curriculum path ---------- */
@@ -462,7 +518,9 @@ const ERR = {
   no_name: "이름을 입력하세요.",
   no_user: "등록되지 않은 이름입니다. 로그아웃 후 다시 들어오세요.",
   not_configured: "관리자 설정이 끝나지 않았습니다. Apps Script의 스크립트 속성(ACCESS_CODE, ADMIN_CODE)을 확인하세요.",
-  bad_admin_code: "관리자 코드가 맞지 않습니다.",
+  not_in_roster: "운영진 명단에 없는 이름입니다. 관리자에게 명단 등록을 요청하세요(이름을 명단과 똑같이 입력).",
+  inactive: "퇴사 처리된 이름이라 들어올 수 없습니다. 관리자에게 문의하세요.",
+  pin_reset: "관리자가 PIN을 초기화했습니다. 이름과 새로 쓸 PIN을 입력해 다시 들어오세요.",
   network: "서버에 연결하지 못했습니다. 인터넷 연결과 config.js의 API_URL을 확인하세요."
 };
 
@@ -494,7 +552,7 @@ async function pushSync(){
   try{
     const r = await api(savePayload());
     if(r.ok){ SYNC.state = "saved"; SYNC.at = new Date(); }
-    else SYNC.state = (r.error === "bad_code" || r.error === "bad_pin") ? "denied" : "failed";
+    else SYNC.state = FORCE_OUT[r.error] ? "denied" : "failed";
   }catch(e){ SYNC.state = "failed"; }
   if(SYNC.state === "failed"){ clearTimeout(SYNC.timer); SYNC.timer = setTimeout(pushSync, 30000); }
   paintSync();
@@ -508,7 +566,7 @@ function hhmm(d){ return String(d.getHours()).padStart(2, "0") + ":" + String(d.
 function syncLabel(){
   return ({preview:"미리보기 모드 · 서버에 저장하지 않음", idle:"", saving:"저장 중…",
     saved:"서버에 저장됨 " + (SYNC.at ? hhmm(SYNC.at) : ""), failed:"저장 실패 · 30초 뒤 다시 시도",
-    denied:"접속 코드가 바뀌어 저장할 수 없습니다. 로그아웃 후 다시 들어오세요."})[SYNC.state] || "";
+    denied:"서버가 저장을 거부했습니다(접속 코드 변경, 명단 제외 등). 로그아웃 후 다시 들어오세요."})[SYNC.state] || "";
 }
 function paintSync(){
   const t = syncLabel();
@@ -546,16 +604,14 @@ function renderGate(msg){
       ${PREVIEW ? "" : `<div class="field"><label for="gPin">개인 PIN (숫자 4자리)</label><input id="gPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"><small class="muted">처음 들어올 때 정한 번호가 내 PIN이 됩니다. 다른 기기에서도 같은 이름과 PIN으로 이어서 합니다.</small></div>`}
       <p class="gate-msg" id="gMsg" role="alert"></p>
       <button class="btn" type="submit" id="gBtn">${PREVIEW ? "미리보기로 입장" : "입장"}</button>
-    </form>
-    ${PREVIEW ? "" : `<div class="gate-foot"><button class="linkbtn" type="button" id="toAdmin">관리자 화면</button></div>`}`;
+    </form>`;
   g.appendChild(card);
   const m = card.querySelector("#gMsg"); if(msg) m.textContent = msg;
   const show = t => { m.textContent = t; };
-  if(!PREVIEW) card.querySelector("#toAdmin").onclick = renderAdmin;
   card.querySelector("#gateForm").onsubmit = async ev => {
     ev.preventDefault();
     const name = cleanName(card.querySelector("#gName").value);
-    if(PREVIEW){ enter({name:name || "미리보기", code:"", pin:""}, null, false); return; }
+    if(PREVIEW){ enter({name:name || "미리보기", code:"", pin:""}, null); return; }
     const code = card.querySelector("#gCode").value.trim(), pin = card.querySelector("#gPin").value.trim();
     if(!code || !name) return show("접속 코드와 이름을 입력하세요.");
     if(!/^\d{4}$/.test(pin)) return show(ERR.bad_pin_format);
@@ -563,82 +619,39 @@ function renderGate(msg){
     try{
       const r = await api({action:"login", code, name, pin});
       if(!r.ok){ show(ERR[r.error] || ("들어가지 못했습니다(" + r.error + ").")); return; }
-      enter({name, code, pin}, r.progress, r.isNew);
+      enter({name, code, pin}, r);
     }catch(e){ show(ERR.network); }
     finally{ btn.disabled = false; btn.textContent = "입장"; }
   };
   (card.querySelector(PREVIEW ? "#gName" : "#gCode")).focus();
 }
-function enter(user, serverProgress, isNew){
+function enter(user, r){
   USER = user;
   try{ localStorage.setItem(SESSION_KEY, JSON.stringify(user)); }catch(e){}
   S = loadState();
-  if(serverProgress) mergeProgress(serverProgress);
+  if(r && r.progress) mergeProgress(r.progress);
   S.name = user.name;
   try{ localStorage.setItem(storeKey(), JSON.stringify(S)); }catch(e){}
+  setHomeInfo(PREVIEW ? previewHomeInfo() : r);
   showApp();
-  if(isNew) toast(user.name + "님이 등록됐습니다. PIN을 기억해 두세요.");
+  if(r && r.isNew) toast(user.name + "님이 등록됐습니다. PIN을 기억해 두세요.");
   queueSync();
 }
+const ROUTES_FROM_HASH = ["path", "wrong", "badges", "speed", "final", "guide", "tools", "library"];
 function showApp(){
   const g = document.getElementById("gate"); g.hidden = true; g.innerHTML = "";
   document.getElementById("topbar").hidden = false;
   renderTop(); paintSync();
   const h = (location.hash || "").slice(1);
-  go(["path", "wrong", "badges", "speed", "final"].includes(h) ? h : "home");
+  go(ROUTES_FROM_HASH.includes(h) ? h : "home");
 }
-function logout(){
+const FORCE_OUT = {bad_code:"접속 코드가 바뀌었습니다. 새 코드로 다시 들어오세요.", bad_pin:ERR.bad_pin, not_in_roster:ERR.not_in_roster,
+  inactive:ERR.inactive, pin_reset:ERR.pin_reset, no_user:"기록을 찾지 못했습니다. 이름과 PIN으로 다시 들어오세요."};
+function logout(msg){
   if(SYNC.timer){ clearTimeout(SYNC.timer); SYNC.timer = null; if(USER && !PREVIEW) api(savePayload()).catch(() => {}); }
   try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
-  USER = null; S = freshState(); SYNC.state = PREVIEW ? "preview" : "idle";
-  renderGate("로그아웃했습니다.");
-}
-
-/* ---------- admin: team progress ---------- */
-function renderAdmin(){
-  document.getElementById("topbar").hidden = true; app().innerHTML = "";
-  const g = document.getElementById("gate"); g.hidden = false; g.innerHTML = "";
-  const card = el("div", {class:"sheet pad admin"});
-  card.innerHTML = `<div class="row" style="justify-content:space-between"><div><p class="eyebrow">${esc(ORG.ORG_NAME ? ORG.ORG_NAME + " · " : "")}관리자</p><h2>운영진 진도 현황</h2></div><button class="linkbtn" type="button" id="adBack">로그인 화면으로</button></div>
-    <form id="adForm" class="row" novalidate style="align-items:flex-end"><div class="field"><label for="adCode">관리자 코드</label><input id="adCode" type="password" autocomplete="off"></div><button class="btn" type="submit">불러오기</button></form>
-    <p class="gate-msg" id="adMsg" role="alert"></p><div id="adOut"></div>`;
-  g.appendChild(card);
-  card.querySelector("#adBack").onclick = () => renderGate();
-  let adminCode = "";
-  const msg = card.querySelector("#adMsg");
-  const load = async () => {
-    msg.textContent = "불러오는 중…";
-    try{
-      const r = await api({action:"admin", code:adminCode});
-      if(!r.ok){ msg.textContent = ERR[r.error] || ("불러오지 못했습니다(" + r.error + ")."); return; }
-      msg.textContent = ""; drawAdmin(card.querySelector("#adOut"), r.rows || [], load);
-    }catch(e){ msg.textContent = ERR.network; }
-  };
-  card.querySelector("#adForm").onsubmit = ev => { ev.preventDefault(); adminCode = card.querySelector("#adCode").value.trim(); if(adminCode) load(); };
-  card.querySelector("#adCode").focus();
-}
-function fmtTime(iso){ const d = new Date(iso); if(!iso || isNaN(d)) return "-"; return (d.getMonth() + 1) + "." + d.getDate() + ". " + hhmm(d); }
-function drawAdmin(box, rows, reload){
-  rows.sort((a, b) => (Number(b.cleared) - Number(a.cleared)) || (Number(b.xp) - Number(a.xp)));
-  const n = rows.length, all8 = rows.filter(r => Number(r.cleared) >= 8).length, passed = rows.filter(r => r.finalPassed).length;
-  const avg = n ? (rows.reduce((s, r) => s + (Number(r.cleared) || 0), 0) / n).toFixed(1) : "0";
-  box.innerHTML = `<div class="sheet"><div class="stats"><div><b>${n}</b><span>등록 인원</span></div><div><b>${avg}</b><span>평균 통과 단계</span></div><div><b>${all8}</b><span>8단계 모두 통과</span></div><div><b>${passed}</b><span>최종 심사 합격</span></div></div></div>
-    <div class="row" style="justify-content:space-between;margin-top:14px"><p class="muted" style="font-size:13px;max-width:60ch">숫자는 단계별 최고 점수이고 80점 이상이 통과입니다. 원본은 구글 시트의 '진도' 탭에 있습니다.</p><button class="btn ghost" type="button" id="adReload">새로고침</button></div>
-    <div class="tablewrap"><table class="adt"><thead><tr><th>이름</th><th>레벨</th>${CURR.map(m => `<th title="${esc(m.title)}">${m.no}</th>`).join("")}<th>최종 심사</th><th>배지</th><th>마지막 학습</th></tr></thead><tbody></tbody></table></div>`;
-  const tb = box.querySelector("tbody");
-  if(!n) tb.innerHTML = `<tr><td colspan="${CURR.length + 5}" class="muted">아직 들어온 운영진이 없습니다.</td></tr>`;
-  rows.forEach(r => {
-    const tr = document.createElement("tr");
-    const best = (r.best || []).concat([0, 0, 0, 0, 0, 0, 0, 0]).slice(0, 8);
-    const fb = Number(r.finalBest) || 0;
-    tr.innerHTML = `<td class="nm"></td><td><span class="lvname"></span><br><small class="muted mono">${Number(r.xp) || 0} XP</small></td>` +
-      best.map(b => { const v = Number(b) || 0; return `<td class="sc ${v >= 80 ? "ok" : v > 0 ? "mid" : ""}">${v || "·"}</td>`; }).join("") +
-      `<td>${r.finalPassed ? `<b class="pass">합격</b> <span class="mono">${fb}</span>` : (fb ? `<span class="mono">${fb}점</span>` : "-")}</td><td class="mono">${Number(r.badges) || 0}</td><td class="mono">${fmtTime(r.last)}</td>`;
-    tr.querySelector(".nm").textContent = r.name;
-    tr.querySelector(".lvname").textContent = r.level || "-";
-    tb.appendChild(tr);
-  });
-  box.querySelector("#adReload").onclick = reload;
+  USER = null; S = freshState(); HOMEINFO = {profile:null, notices:[]}; SYNC.state = PREVIEW ? "preview" : "idle";
+  renderGate(typeof msg === "string" ? msg : "로그아웃했습니다.");
 }
 
 /* ---------- boot ---------- */
@@ -649,20 +662,23 @@ function boot(){
   document.getElementById("goHome").onclick = () => go("home");
   document.querySelectorAll("#nav button").forEach(b => b.onclick = () => go(b.dataset.go));
   let sess = null; try{ sess = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); }catch(e){}
-  if(PREVIEW){ if(sess && sess.name){ USER = sess; S = loadState(); showApp(); } else renderGate(); return; }
+  if(PREVIEW){
+    if(sess && sess.name){ USER = sess; S = loadState(); setHomeInfo(previewHomeInfo()); showApp(); } else renderGate();
+    return;
+  }
   if(!(sess && sess.code && sess.name && sess.pin)){ renderGate(); return; }
-  USER = sess; S = loadState(); showApp();
-  api({action:"login", code:sess.code, name:sess.name, pin:sess.pin}).then(r => {
+  USER = sess; S = loadState(); loadHomeInfo(); showApp();
+  // 저장된 세션으로 바로 들어간 뒤, 서버에서 코드·명단·공지를 다시 확인합니다.
+  api({action:"login", code:sess.code, name:sess.name, pin:sess.pin, resume:true}).then(r => {
     if(r.ok){
-      const before = S.xp;
       if(r.progress) mergeProgress(r.progress);
-      if(S.xp !== before){ try{ localStorage.setItem(storeKey(), JSON.stringify(S)); }catch(e){} renderTop(); if(ROUTE === "home") go("home"); }
+      try{ localStorage.setItem(storeKey(), JSON.stringify(S)); }catch(e){}
+      setHomeInfo(r); renderTop();
+      if(ROUTE === "home") go("home");
       queueSync();
-    } else if(r.error === "bad_code" || r.error === "bad_pin"){
-      try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
-      USER = null; S = freshState();
-      renderGate(r.error === "bad_code" ? "접속 코드가 바뀌었습니다. 새 코드로 다시 들어오세요." : ERR.bad_pin);
+    } else if(FORCE_OUT[r.error]){
+      logout(FORCE_OUT[r.error]);
     }
   }).catch(() => { SYNC.state = "failed"; paintSync(); });
 }
-boot();
+document.addEventListener("DOMContentLoaded", boot);
